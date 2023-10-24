@@ -9,10 +9,12 @@ import (
 )
 
 type Config struct {
-	BindAddr  string     `split_words:"true" default:":8842"`
-	Mode      string     `split_words:"true" default:"release"`
-	MTLS      MTLSConfig `split_words:"true"`
-	processed bool
+	BindAddr      string             `split_words:"true" default:":8842"`
+	Mode          string             `split_words:"true" default:"release"`
+	MTLS          MTLSConfig         `split_words:"true"`
+	LocalStorage  LocalStorageConfig `split_words:"true"`
+	SecretManager SecretsConfig      `split_words:"true"`
+	processed     bool
 }
 
 type MTLSConfig struct {
@@ -21,6 +23,17 @@ type MTLSConfig struct {
 	PoolPath string `split_words:"true"`
 	pool     *x509.CertPool
 	cert     tls.Certificate
+}
+
+type LocalStorageConfig struct {
+	Enabled bool   `split_words:"true" default:"false"`
+	Path    string `split_words:"true"`
+}
+
+type SecretsConfig struct {
+	Enabled     bool   `split_words:"true" default:"false"`
+	Credentials string `split_words:"true"`
+	Project     string `split_words:"true"`
 }
 
 // Create a new Config struct using values from the environment prefixed with COURIER.
@@ -60,6 +73,22 @@ func (c Config) Validate() (err error) {
 	}
 
 	if err = c.MTLS.Validate(); err != nil {
+		return err
+	}
+
+	if !c.LocalStorage.Enabled && !c.SecretManager.Enabled {
+		return ErrNoStorageEnabled
+	}
+
+	if c.LocalStorage.Enabled && c.SecretManager.Enabled {
+		return ErrMultipleStorageEnabled
+	}
+
+	if err = c.LocalStorage.Validate(); err != nil {
+		return err
+	}
+
+	if err = c.SecretManager.Validate(); err != nil {
 		return err
 	}
 
@@ -153,6 +182,34 @@ func (c *MTLSConfig) load() (err error) {
 
 	if c.cert, err = provider.GetKeyPair(); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (c LocalStorageConfig) Validate() (err error) {
+	if !c.Enabled {
+		return nil
+	}
+
+	if c.Path == "" {
+		return ErrMissingLocalPath
+	}
+
+	return nil
+}
+
+func (c SecretsConfig) Validate() (err error) {
+	if !c.Enabled {
+		return nil
+	}
+
+	if c.Credentials == "" {
+		return ErrMissingSecretsCredentials
+	}
+
+	if c.Project == "" {
+		return ErrMissingSecretsProject
 	}
 
 	return nil

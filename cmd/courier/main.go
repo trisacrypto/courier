@@ -12,6 +12,7 @@ import (
 	courier "github.com/trisacrypto/courier/pkg"
 	"github.com/trisacrypto/courier/pkg/api/v1"
 	"github.com/trisacrypto/courier/pkg/config"
+	"github.com/trisacrypto/courier/pkg/secrets"
 	"github.com/urfave/cli/v2"
 )
 
@@ -53,6 +54,34 @@ func main() {
 						Usage:    "url to connect to the courier server",
 						EnvVars:  []string{"COURIER_CLIENT_URL"},
 						Required: true,
+					},
+				},
+			},
+			{
+				Name:     "secrets:get",
+				Usage:    "get a secret from the secret manager",
+				Category: "secrets",
+				Action:   getSecret,
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "project",
+						Aliases:  []string{"p"},
+						Usage:    "project name where the secret is stored",
+						EnvVars:  []string{"COURIER_SECRET_MANAGER_PROJECT"},
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "name",
+						Aliases:  []string{"n"},
+						Usage:    "name of the secret to get",
+						EnvVars:  []string{"COURIER_SECRET_NAME"},
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:    "credentials",
+						Aliases: []string{"c"},
+						Usage:   "path to the credentials file for the secret manager",
+						EnvVars: []string{"GOOGLE_APPLICATION_CREDENTIALS"},
 					},
 				},
 			},
@@ -107,6 +136,31 @@ func status(c *cli.Context) (err error) {
 	}
 
 	return printJSON(rep)
+}
+
+// Get a secret from the secret manager.
+func getSecret(c *cli.Context) (err error) {
+	conf := config.SecretsConfig{
+		Enabled:     true,
+		Project:     c.String("project"),
+		Credentials: c.String("credentials"),
+	}
+
+	secrets, err := secrets.NewClient(conf)
+	if err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var secret []byte
+	if secret, err = secrets.GetLatestVersion(ctx, c.String("name")); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	fmt.Println(string(secret))
+	return nil
 }
 
 //===========================================================================

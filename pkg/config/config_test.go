@@ -10,11 +10,16 @@ import (
 
 // Define a test environment for the config tests.
 var testEnv = map[string]string{
-	"COURIER_BIND_ADDR":      ":8080",
-	"COURIER_MODE":           "debug",
-	"COURIER_MTLS_INSECURE":  "false",
-	"COURIER_MTLS_CERT_PATH": "/path/to/cert",
-	"COURIER_MTLS_POOL_PATH": "/path/to/pool",
+	"COURIER_BIND_ADDR":                  ":8080",
+	"COURIER_MODE":                       "debug",
+	"COURIER_MTLS_INSECURE":              "false",
+	"COURIER_MTLS_CERT_PATH":             "/path/to/cert",
+	"COURIER_MTLS_POOL_PATH":             "/path/to/pool",
+	"COURIER_LOCAL_STORAGE_ENABLED":      "true",
+	"COURIER_LOCAL_STORAGE_PATH":         "/path/to/storage",
+	"COURIER_SECRET_MANAGER_ENABLED":     "true",
+	"COURIER_SECRET_MANAGER_CREDENTIALS": "test-credentials",
+	"COURIER_SECRET_MANAGER_PROJECT":     "test-project",
 }
 
 func TestConfig(t *testing.T) {
@@ -40,6 +45,11 @@ func TestConfig(t *testing.T) {
 	require.False(t, conf.MTLS.Insecure)
 	require.Equal(t, testEnv["COURIER_MTLS_CERT_PATH"], conf.MTLS.CertPath)
 	require.Equal(t, testEnv["COURIER_MTLS_POOL_PATH"], conf.MTLS.PoolPath)
+	require.True(t, conf.LocalStorage.Enabled)
+	require.Equal(t, testEnv["COURIER_LOCAL_STORAGE_PATH"], conf.LocalStorage.Path)
+	require.True(t, conf.SecretManager.Enabled)
+	require.Equal(t, testEnv["COURIER_SECRET_MANAGER_CREDENTIALS"], conf.SecretManager.Credentials)
+	require.Equal(t, testEnv["COURIER_SECRET_MANAGER_PROJECT"], conf.SecretManager.Project)
 }
 
 func TestValidate(t *testing.T) {
@@ -49,6 +59,10 @@ func TestValidate(t *testing.T) {
 			Mode:     "debug",
 			MTLS: config.MTLSConfig{
 				Insecure: true,
+			},
+			LocalStorage: config.LocalStorageConfig{
+				Enabled: true,
+				Path:    "/path/to/storage",
 			},
 		}
 		require.NoError(t, conf.Validate(), "insecure config should be valid")
@@ -61,6 +75,10 @@ func TestValidate(t *testing.T) {
 			MTLS: config.MTLSConfig{
 				CertPath: "/path/to/cert",
 				PoolPath: "/path/to/pool",
+			},
+			LocalStorage: config.LocalStorageConfig{
+				Enabled: true,
+				Path:    "/path/to/storage",
 			},
 		}
 		require.NoError(t, conf.Validate(), "secure config should be valid")
@@ -95,6 +113,83 @@ func TestValidate(t *testing.T) {
 			},
 		}
 		require.ErrorIs(t, conf.Validate(), config.ErrMissingCertPaths, "config should be invalid")
+	})
+
+	t.Run("MissingStorage", func(t *testing.T) {
+		conf := config.Config{
+			BindAddr: ":8080",
+			Mode:     "debug",
+			MTLS: config.MTLSConfig{
+				Insecure: true,
+			},
+		}
+		require.ErrorIs(t, conf.Validate(), config.ErrNoStorageEnabled, "config should be invalid")
+	})
+
+	t.Run("MultipleStorage", func(t *testing.T) {
+		conf := config.Config{
+			BindAddr: ":8080",
+			Mode:     "debug",
+			MTLS: config.MTLSConfig{
+				Insecure: true,
+			},
+			LocalStorage: config.LocalStorageConfig{
+				Enabled: true,
+				Path:    "/path/to/storage",
+			},
+			SecretManager: config.SecretsConfig{
+				Enabled:     true,
+				Credentials: "test-credentials",
+				Project:     "test-project",
+			},
+		}
+		require.ErrorIs(t, conf.Validate(), config.ErrMultipleStorageEnabled, "config should be invalid")
+	})
+
+	t.Run("MissingLocalPath", func(t *testing.T) {
+		conf := config.Config{
+			BindAddr: ":8080",
+			Mode:     "debug",
+			MTLS: config.MTLSConfig{
+				Insecure: true,
+			},
+			LocalStorage: config.LocalStorageConfig{
+				Enabled: true,
+			},
+		}
+		require.ErrorIs(t, conf.Validate(), config.ErrMissingLocalPath, "config should be invalid")
+	})
+}
+
+func TestValidateSecretConfig(t *testing.T) {
+	t.Run("ValidSecretConfig", func(t *testing.T) {
+		conf := config.SecretsConfig{
+			Enabled:     true,
+			Credentials: "test-credentials",
+			Project:     "test-project",
+		}
+		require.NoError(t, conf.Validate(), "secret config should be valid")
+	})
+
+	t.Run("ValidDisabled", func(t *testing.T) {
+		conf := config.SecretsConfig{}
+		require.NoError(t, conf.Validate(), "expected disabled secret config to be valid")
+	})
+
+	t.Run("MissingCredentials", func(t *testing.T) {
+		conf := config.SecretsConfig{
+			Enabled: true,
+			Project: "test-project",
+		}
+		require.ErrorIs(t, conf.Validate(), config.ErrMissingSecretsCredentials, "config should be invalid")
+	})
+
+	t.Run("MissingProject", func(t *testing.T) {
+		conf := config.SecretsConfig{
+			Enabled:     true,
+			Credentials: "test-credentials",
+		}
+		require.ErrorIs(t, conf.Validate(), config.ErrMissingSecretsProject, "config should be invalid")
 	})
 }
 
