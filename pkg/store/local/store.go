@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	passwordPrefix    = "password"
-	passwordFile      = "password.txt"
+	passwordPrefix    = "pkcs12"
+	passwordFile      = "pkcs12.password"
 	certificatePrefix = "certificate"
-	certificateFile   = "certificate.pem"
+	certificateFile   = "certificate"
 )
 
 // Open the local storage backend.
