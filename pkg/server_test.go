@@ -29,6 +29,10 @@ func (s *courierTestSuite) SetupSuite() {
 		MTLS: config.MTLSConfig{
 			Insecure: true,
 		},
+		LocalStorage: config.LocalStorageConfig{
+			Enabled: true,
+			Path:    "/tmp/courier",
+		},
 	}.Mark()
 	require.NoError(err, "could not create test configuration")
 
