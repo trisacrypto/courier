@@ -9,6 +9,7 @@ import (
 	courier "github.com/trisacrypto/courier/pkg"
 	"github.com/trisacrypto/courier/pkg/api/v1"
 	"github.com/trisacrypto/courier/pkg/config"
+	"github.com/trisacrypto/courier/pkg/store/mock"
 )
 
 // The courier test suite allows us to test the courier API by making actual requests
@@ -17,6 +18,7 @@ type courierTestSuite struct {
 	suite.Suite
 	courier *courier.Server
 	client  api.CourierClient
+	store   *mock.Store
 }
 
 func (s *courierTestSuite) SetupSuite() {
@@ -40,6 +42,10 @@ func (s *courierTestSuite) SetupSuite() {
 	s.courier, err = courier.New(conf)
 	require.NoError(err, "could not create test server")
 
+	// Use a mock store for testing
+	s.store = mock.New()
+	s.courier.SetStore(s.store)
+
 	// Start the server, which will run for the duration of the test suite
 	go s.courier.Serve()
 
@@ -59,4 +65,13 @@ func (s *courierTestSuite) TearDownSuite() {
 
 func TestCourier(t *testing.T) {
 	suite.Run(t, new(courierTestSuite))
+}
+
+// Check that the correct HTTP status code is in the error
+func (s *courierTestSuite) CheckHTTPStatus(err error, status int, msgAndArgs ...interface{}) {
+	require := s.Require()
+	require.NotNil(err, "expected an HTTP error")
+	statusErr, ok := err.(*api.StatusError)
+	require.True(ok, "expected error to be a StatusError")
+	require.Equal(status, statusErr.Code, msgAndArgs...)
 }
