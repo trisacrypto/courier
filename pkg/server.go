@@ -2,6 +2,7 @@ package courier
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"os"
@@ -13,6 +14,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/trisacrypto/courier/pkg/api/v1"
 	"github.com/trisacrypto/courier/pkg/config"
+	"github.com/trisacrypto/courier/pkg/store"
+	"github.com/trisacrypto/courier/pkg/store/local"
 )
 
 // New creates a new server object from configuration but does not serve it yet.
@@ -30,7 +33,15 @@ func New(conf config.Config) (s *Server, err error) {
 		echan: make(chan error, 1),
 	}
 
-	// TODO: Initialize the configured stores
+	// Open the store
+	switch {
+	case conf.LocalStorage.Enabled:
+		if s.store, err = local.Open(conf.LocalStorage); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("no storage backend configured")
+	}
 
 	// Create the router
 	gin.SetMode(conf.Mode)
@@ -61,6 +72,7 @@ type Server struct {
 	conf    config.Config
 	srv     *http.Server
 	router  *gin.Engine
+	store   store.Store
 	started time.Time
 	healthy bool
 	url     string
@@ -144,7 +156,11 @@ func (s *Server) setupRoutes() (err error) {
 		// Status route
 		v1.GET("/status", s.Status)
 
-		// TODO: Password and certificate routes
+		// Certificate routes
+		certs := v1.Group("/certs")
+		{
+			certs.POST("/:id/pkcs12password", s.StoreCertificatePassword)
+		}
 	}
 
 	// Not found and method not allowed routes
@@ -182,4 +198,9 @@ func (s *Server) URL() string {
 	s.RLock()
 	defer s.RUnlock()
 	return s.url
+}
+
+// SetStore directly sets the store for the server.
+func (s *Server) SetStore(store store.Store) {
+	s.store = store
 }

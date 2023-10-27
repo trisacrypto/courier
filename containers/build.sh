@@ -1,3 +1,3 @@
 #!/bin/bash
 
-docker build -t trisa/courier:latest -f ./containers/Dockerfile .
+docker build -t trisa/courier:latest -f ./containers/courier/Dockerfile .
