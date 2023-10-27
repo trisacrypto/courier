@@ -103,6 +103,9 @@ func (s *Store) fullPath(prefix, name string) string {
 func (s *Store) readFile(path string) (data []byte, err error) {
 	var f *os.File
 	if f, err = os.Open(path); err != nil {
+		if os.IsNotExist(err) {
+			return nil, store.ErrNotFound
+		}
 		return nil, err
 	}
 
