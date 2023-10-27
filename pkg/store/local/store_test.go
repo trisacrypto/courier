@@ -1,6 +1,7 @@
 package local_test
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -20,10 +21,11 @@ func (s *localStoreTestSuite) SetupSuite() {
 	// Open the storage backend in a temporary directory
 	var err error
 	path := s.T().TempDir()
-	s.store, err = local.Open(config.LocalStorageConfig{
+	s.conf = config.LocalStorageConfig{
 		Enabled: true,
 		Path:    path,
-	})
+	}
+	s.store, err = local.Open(s.conf)
 	s.NoError(err, "could not open local storage backend")
 }
 
@@ -39,36 +41,38 @@ func TestLocalStore(t *testing.T) {
 
 func (s *localStoreTestSuite) TestPasswordStore() {
 	require := s.Require()
+	ctx := context.Background()
 
 	// Try to get a password that does not exist
-	_, err := s.store.GetPassword("does-not-exist")
+	_, err := s.store.GetPassword(ctx, "does-not-exist")
 	require.ErrorIs(err, store.ErrNotFound, "should return error if password does not exist")
 
 	// Create a password
 	password := []byte("password")
-	err = s.store.UpdatePassword("password_id", password)
+	err = s.store.UpdatePassword(ctx, "password_id", password)
 	require.NoError(err, "should be able to create a password")
 
 	// Get the password
-	actual, err := s.store.GetPassword("password_id")
+	actual, err := s.store.GetPassword(ctx, "password_id")
 	require.NoError(err, "should be able to get a password")
 	require.Equal(password, actual, "wrong password returned")
 }
 
 func (s *localStoreTestSuite) TestCertificateStore() {
 	require := s.Require()
+	ctx := context.Background()
 
 	// Try to get a certificate that does not exist
-	_, err := s.store.GetCertificate("does-not-exist")
+	_, err := s.store.GetCertificate(ctx, "does-not-exist")
 	require.ErrorIs(err, store.ErrNotFound, "should return error if certificate does not exist")
 
 	// Create a certificate
 	cert := []byte("certificate")
-	err = s.store.UpdateCertificate("certificate_id", cert)
+	err = s.store.UpdateCertificate(ctx, "certificate_id", cert)
 	require.NoError(err, "should be able to create a certificate")
 
 	// Get the certificate
-	actual, err := s.store.GetCertificate("certificate_id")
+	actual, err := s.store.GetCertificate(ctx, "certificate_id")
 	require.NoError(err, "should be able to get a certificate")
 	require.Equal(cert, actual, "wrong certificate returned")
 }
