@@ -2,6 +2,7 @@ package local
 
 import (
 	"archive/zip"
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,10 +13,8 @@ import (
 )
 
 const (
-	passwordPrefix    = "pkcs12"
-	passwordFile      = "pkcs12.password"
-	certificatePrefix = "certificate"
-	certificateFile   = "certificate"
+	passwordFile    = "pkcs12.password"
+	certificateFile = "certificate"
 )
 
 // Open the local storage backend.
@@ -50,18 +49,18 @@ func (s *Store) Close() error {
 //===========================================================================
 
 // GetPassword retrieves a password by id from the local storage backend.
-func (s *Store) GetPassword(id string) (password []byte, err error) {
+func (s *Store) GetPassword(ctx context.Context, id string) (password []byte, err error) {
 	s.RLock()
 	defer s.RUnlock()
-	return s.load(s.fullPath(passwordPrefix, id))
+	return s.load(s.fullPath(store.PasswordPrefix, id))
 }
 
 // UpdatePassword updates a password by id in the local storage backend. If the
 // password does not exist, it is created. Otherwise, it is overwritten.
-func (s *Store) UpdatePassword(id string, password []byte) (err error) {
+func (s *Store) UpdatePassword(ctx context.Context, id string, password []byte) (err error) {
 	s.Lock()
 	defer s.Unlock()
-	return s.store(s.fullPath(passwordPrefix, id), passwordFile, password)
+	return s.store(s.fullPath(store.PasswordPrefix, id), passwordFile, password)
 }
 
 //===========================================================================
@@ -69,17 +68,17 @@ func (s *Store) UpdatePassword(id string, password []byte) (err error) {
 //===========================================================================
 
 // GetCertificate retrieves a certificate by id from the local storage backend.
-func (s *Store) GetCertificate(name string) (cert []byte, err error) {
+func (s *Store) GetCertificate(ctx context.Context, name string) (cert []byte, err error) {
 	s.RLock()
 	defer s.RUnlock()
-	return s.load(s.fullPath(certificatePrefix, name))
+	return s.load(s.fullPath(store.CertificatePrefix, name))
 }
 
 // UpdateCertificate updates a certificate in the local storage backend.
-func (s *Store) UpdateCertificate(name string, cert []byte) (err error) {
+func (s *Store) UpdateCertificate(ctx context.Context, name string, cert []byte) (err error) {
 	s.Lock()
 	defer s.Unlock()
-	return s.store(s.fullPath(certificatePrefix, name), certificateFile, cert)
+	return s.store(s.fullPath(store.CertificatePrefix, name), certificateFile, cert)
 }
 
 //===========================================================================

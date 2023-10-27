@@ -15,7 +15,7 @@ import (
 )
 
 // NewClient creates a secret manager client from the configuration.
-func NewClient(conf config.SecretsConfig) (_ secretManagerClient, err error) {
+func NewClient(conf config.SecretsConfig, opts ...SecretsOption) (_ SecretManagerClient, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -23,15 +23,24 @@ func NewClient(conf config.SecretsConfig) (_ secretManagerClient, err error) {
 		parent: "projects/" + conf.Project,
 	}
 
-	// Specify credentials path if provided
-	opts := []option.ClientOption{}
-	if conf.Credentials != "" {
-		opts = append(opts, option.WithCredentialsFile(conf.Credentials))
+	// Apply provided options
+	for _, opt := range opts {
+		if err = opt(s); err != nil {
+			return nil, err
+		}
 	}
 
-	// Create the client
-	if s.client, err = secretmanager.NewClient(ctx, opts...); err != nil {
-		return nil, err
+	if s.client == nil {
+		// Specify credentials path if provided
+		opts := []option.ClientOption{}
+		if conf.Credentials != "" {
+			opts = append(opts, option.WithCredentialsFile(conf.Credentials))
+		}
+
+		// Create the client
+		if s.client, err = secretmanager.NewClient(ctx, opts...); err != nil {
+			return nil, err
+		}
 	}
 
 	return s, nil
@@ -40,10 +49,10 @@ func NewClient(conf config.SecretsConfig) (_ secretManagerClient, err error) {
 // GoogleSecrets implements the secret manager interface.
 type GoogleSecrets struct {
 	parent string
-	client *secretmanager.Client
+	client GRPCSecretClient
 }
 
-var _ secretManagerClient = &GoogleSecrets{}
+var _ SecretManagerClient = &GoogleSecrets{}
 
 //===========================================================================
 // Secret Manager Methods
@@ -145,6 +154,11 @@ func (s *GoogleSecrets) GetLatestVersion(ctx context.Context, name string) (_ []
 		// If the API call is malformed, it will hang until the internal context times out
 		if errors.Is(err, context.DeadlineExceeded) {
 			return nil, err
+		}
+
+		serr, ok := status.FromError(err)
+		if ok && serr.Code() == codes.NotFound {
+			return nil, ErrSecretNotFound
 		}
 
 		// If the error is something else, something went wrong.
