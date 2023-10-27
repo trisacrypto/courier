@@ -29,7 +29,7 @@ func (s *Server) StoreCertificatePassword(c *gin.Context) {
 	}
 
 	// Store the password
-	if err = s.store.UpdatePassword(c.Param("id"), []byte(req.Password)); err != nil {
+	if err = s.store.UpdatePassword(c.Request.Context(), c.Param("id"), []byte(req.Password)); err != nil {
 		c.JSON(http.StatusInternalServerError, api.ErrorResponse(err))
 		return
 	}

@@ -17,7 +17,7 @@ func (s *courierTestSuite) TestStoreCertificatePassword() {
 			ID:       "certID",
 			Password: "password",
 		}
-		s.store.OnUpdatePassword = func(name string, password []byte) error {
+		s.store.OnUpdatePassword = func(ctx context.Context, name string, password []byte) error {
 			require.Equal(req.ID, name, "wrong password name passed to store")
 			require.Equal([]byte(req.Password), password, "wrong password passed to store")
 			return nil
@@ -38,7 +38,7 @@ func (s *courierTestSuite) TestStoreCertificatePassword() {
 	})
 
 	s.Run("StoreError", func() {
-		s.store.OnUpdatePassword = func(name string, password []byte) error {
+		s.store.OnUpdatePassword = func(ctx context.Context, name string, password []byte) error {
 			return errors.New("internal store error")
 		}
 		defer s.store.Reset()
