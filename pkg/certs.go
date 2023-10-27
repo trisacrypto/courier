@@ -22,6 +22,7 @@ func (s *Server) StoreCertificate(c *gin.Context) {
 	)
 
 	id := c.Param("id")
+	ctx := c.Request.Context()
 
 	// Parse the request body
 	req = &api.StoreCertificateRequest{}
@@ -36,18 +37,17 @@ func (s *Server) StoreCertificate(c *gin.Context) {
 		return
 	}
 
-	// Decode the certificate data
+	// Decode the certificate data from the request
 	var data []byte
 	if data, err = base64.StdEncoding.DecodeString(req.Base64Certificate); err != nil {
 		c.JSON(http.StatusBadRequest, api.ErrorResponse(err))
 		return
 	}
 
-	// If encryption is enabled, retrieve the pkcs12 password from the store
-	var password string
 	if !req.NoDecrypt {
+		// If decryption is enabled, retrieve the pkcs12 password from the store
 		var password []byte
-		if password, err = s.store.GetPassword(id); err != nil {
+		if password, err = s.store.GetPassword(ctx, id); err != nil {
 			if errors.Is(err, store.ErrNotFound) {
 				c.JSON(http.StatusNotFound, api.ErrorResponse("pkcs12 password not found, unable to decrypt certificate"))
 				return
@@ -56,22 +56,29 @@ func (s *Server) StoreCertificate(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, api.ErrorResponse(err))
 			return
 		}
+
+		// Decrypt the certificate using the password
+		var provider *trust.Provider
+		if provider, err = trust.Decrypt(data, string(password)); err != nil {
+			c.JSON(http.StatusConflict, api.ErrorResponse("failed to decrypt certificate with stored pkcs12 password"))
+			return
+		}
+
+		// Encode the decrypted certificate for storage
+		if data, err = provider.Encode(); err != nil {
+			c.JSON(http.StatusInternalServerError, api.ErrorResponse(err))
+			return
+		}
 	}
 
-	// Make sure we can decode the certificate, decrypting if necessary
-	var sz *trust.Serializer
-	if sz, err = trust.NewSerializer(req.NoDecrypt, password); err != nil {
+	// Store the certificate data
+	if err = s.store.UpdateCertificate(ctx, id, data); err != nil {
 		c.JSON(http.StatusInternalServerError, api.ErrorResponse(err))
 		return
 	}
 
-	var provider *trust.Provider
-	if provider, err = sz.Extract(data); err != nil {
-		c.JSON(http.StatusBadRequest, api.ErrorResponse(err))
-		return
-	}
-
-	// Store the certificate
+	// Return 204 No Content
+	c.Status(http.StatusNoContent)
 }
 
 // StoreCertificatePassword stores the password for an encrypted certificate and
