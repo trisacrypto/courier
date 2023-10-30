@@ -82,6 +82,27 @@ func (c *APIv1) Status(ctx context.Context) (out *StatusReply, err error) {
 	return out, nil
 }
 
+// StoreCertificate stores the certificate in the request.
+func (c *APIv1) StoreCertificate(ctx context.Context, in *StoreCertificateRequest) (err error) {
+	if in.ID == "" {
+		return ErrIDRequired
+	}
+
+	path := fmt.Sprintf("/v1/certs/%s", in.ID)
+
+	// Create the HTTP request
+	var req *http.Request
+	if req, err = c.NewRequest(ctx, http.MethodPost, path, in, nil); err != nil {
+		return err
+	}
+
+	// Do the request
+	if _, err = c.Do(req, nil, true); err != nil {
+		return err
+	}
+	return nil
+}
+
 // StoreCertificatePassword stores a password for an encrypted certificate.
 func (c *APIv1) StoreCertificatePassword(ctx context.Context, in *StorePasswordRequest) (err error) {
 	if in.ID == "" {

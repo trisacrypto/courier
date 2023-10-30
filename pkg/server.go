@@ -159,6 +159,7 @@ func (s *Server) setupRoutes() (err error) {
 		// Certificate routes
 		certs := v1.Group("/certs")
 		{
+			certs.POST("/:id", s.StoreCertificate)
 			certs.POST("/:id/pkcs12password", s.StoreCertificatePassword)
 		}
 	}
