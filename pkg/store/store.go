@@ -1,6 +1,8 @@
 package store
 
-import "context"
+import (
+	"context"
+)
 
 const (
 	PasswordPrefix    = "pkcs12"

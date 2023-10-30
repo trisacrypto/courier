@@ -1,7 +1,8 @@
 package local
 
 import (
-	"archive/zip"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"io"
 	"os"
@@ -13,8 +14,7 @@ import (
 )
 
 const (
-	passwordFile    = "pkcs12.password"
-	certificateFile = "certificate"
+	archiveExt = ".gz"
 )
 
 // Open the local storage backend.
@@ -52,7 +52,7 @@ func (s *Store) Close() error {
 func (s *Store) GetPassword(ctx context.Context, id string) (password []byte, err error) {
 	s.RLock()
 	defer s.RUnlock()
-	return s.load(s.fullPath(store.PasswordPrefix, id))
+	return s.readFile(s.fullPath(store.PasswordPrefix, id))
 }
 
 // UpdatePassword updates a password by id in the local storage backend. If the
@@ -60,25 +60,34 @@ func (s *Store) GetPassword(ctx context.Context, id string) (password []byte, er
 func (s *Store) UpdatePassword(ctx context.Context, id string, password []byte) (err error) {
 	s.Lock()
 	defer s.Unlock()
-	return s.store(s.fullPath(store.PasswordPrefix, id), passwordFile, password)
+	return s.writeFile(s.fullPath(store.PasswordPrefix, id), password)
 }
 
 //===========================================================================
 // Certificate Methods
 //===========================================================================
 
-// GetCertificate retrieves a certificate by id from the local storage backend.
+// GetCertificate retrieves certificate data by id from the local storage backend.
 func (s *Store) GetCertificate(ctx context.Context, name string) (cert []byte, err error) {
 	s.RLock()
 	defer s.RUnlock()
-	return s.load(s.fullPath(store.CertificatePrefix, name))
+
+	// Load the certificate archive into bytes
+	if cert, err = os.ReadFile(s.fullPath(store.CertificatePrefix, name)); err != nil {
+		if os.IsNotExist(err) {
+			return nil, store.ErrNotFound
+		}
+		return nil, err
+	}
+
+	return cert, nil
 }
 
-// UpdateCertificate updates a certificate in the local storage backend.
+// UpdateCertificate updates certificate data in the local storage backend.
 func (s *Store) UpdateCertificate(ctx context.Context, name string, cert []byte) (err error) {
 	s.Lock()
 	defer s.Unlock()
-	return s.store(s.fullPath(store.CertificatePrefix, name), certificateFile, cert)
+	return os.WriteFile(s.fullPath(store.CertificatePrefix, name), cert, 0644)
 }
 
 //===========================================================================
@@ -87,54 +96,39 @@ func (s *Store) UpdateCertificate(ctx context.Context, name string, cert []byte)
 
 // fullPath returns the full path to an archive file in the local storage backend.
 func (s *Store) fullPath(prefix, name string) string {
-	return filepath.Join(s.path, prefix+"-"+name+".zip")
+	return filepath.Join(s.path, prefix+"-"+name+archiveExt)
 }
 
-// load returns file data by archive path from the local storage
-func (s *Store) load(path string) (data []byte, err error) {
-	var archive *zip.ReadCloser
-	if archive, err = zip.OpenReader(path); err != nil {
+// read returns file data by archive path from the local storage
+func (s *Store) readFile(path string) (data []byte, err error) {
+	var f *os.File
+	if f, err = os.Open(path); err != nil {
 		if os.IsNotExist(err) {
 			return nil, store.ErrNotFound
 		}
 		return nil, err
 	}
-	defer archive.Close()
 
-	// Load the file from the archive
-	if len(archive.File) == 0 {
-		return nil, store.ErrNotFound
-	}
-
-	var reader io.ReadCloser
-	if reader, err = archive.File[0].Open(); err != nil {
+	var reader *gzip.Reader
+	if reader, err = gzip.NewReader(f); err != nil {
 		return nil, err
 	}
-	defer reader.Close()
 
 	return io.ReadAll(reader)
 }
 
-// store saves file data to an archive and file name in the local storage
-func (s *Store) store(path, name string, data []byte) (err error) {
-	var archive *os.File
-	if archive, err = os.Create(path); err != nil {
-		return err
-	}
-	defer archive.Close()
-
-	// Write the file to the archive
-	zipWriter := zip.NewWriter(archive)
-	defer zipWriter.Close()
-
-	var writer io.Writer
-	if writer, err = zipWriter.Create(name); err != nil {
-		return err
-	}
-
+// write saves file data to an archive file in the local storage
+func (s *Store) writeFile(path string, data []byte) (err error) {
+	// Write the data to the archive
+	var b bytes.Buffer
+	writer := gzip.NewWriter(&b)
 	if _, err = writer.Write(data); err != nil {
 		return err
 	}
 
-	return nil
+	// Write the archive to the file
+	if err = writer.Close(); err != nil {
+		return err
+	}
+	return os.WriteFile(path, b.Bytes(), 0644)
 }
