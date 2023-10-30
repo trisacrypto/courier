@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"time"
@@ -54,6 +55,37 @@ func main() {
 						Usage:    "url to connect to the courier server",
 						EnvVars:  []string{"COURIER_CLIENT_URL"},
 						Required: true,
+					},
+				},
+			},
+			{
+				Name:     "store:password",
+				Usage:    "store a pkcs12 password using the courier server",
+				Category: "client",
+				Action:   storePassword,
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "url",
+						Aliases:  []string{"u", "endpoint"},
+						Usage:    "url to connect to the courier server",
+						EnvVars:  []string{"COURIER_CLIENT_URL"},
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "id",
+						Aliases:  []string{"i"},
+						Usage:    "the id of the certificate to store the password for",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:    "password",
+						Aliases: []string{"p"},
+						Usage:   "the password to store",
+					},
+					&cli.StringFlag{
+						Name:    "file",
+						Aliases: []string{"f"},
+						Usage:   "specify a file to read the password from",
 					},
 				},
 			},
@@ -136,6 +168,46 @@ func status(c *cli.Context) (err error) {
 	}
 
 	return printJSON(rep)
+}
+
+// Store a password using the courier service.
+func storePassword(c *cli.Context) (err error) {
+	var client api.CourierClient
+	if client, err = api.New(c.String("url")); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if c.String("password") == "" && c.String("file") == "" {
+		return cli.Exit("either --password or --file must be specified", 1)
+	}
+
+	var password string
+	if password = c.String("password"); password == "" {
+		var f *os.File
+		if f, err = os.Open(c.String("file")); err != nil {
+			return cli.Exit(err, 1)
+		}
+
+		var data []byte
+		if data, err = io.ReadAll(f); err != nil {
+			return cli.Exit(err, 1)
+		}
+
+		password = string(data)
+	}
+
+	req := &api.StorePasswordRequest{
+		ID:       c.String("id"),
+		Password: password,
+	}
+	if err = client.StoreCertificatePassword(ctx, req); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	return nil
 }
 
 // Get a secret from the secret manager.
