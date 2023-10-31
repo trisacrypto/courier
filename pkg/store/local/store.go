@@ -52,7 +52,7 @@ func (s *Store) Close() error {
 func (s *Store) GetPassword(ctx context.Context, id string) (password []byte, err error) {
 	s.RLock()
 	defer s.RUnlock()
-	return s.readFile(s.fullPath(store.PasswordPrefix, id))
+	return s.readFile(s.fullPath(store.PasswordPrefix, id, archiveExt))
 }
 
 // UpdatePassword updates a password by id in the local storage backend. If the
@@ -60,7 +60,7 @@ func (s *Store) GetPassword(ctx context.Context, id string) (password []byte, er
 func (s *Store) UpdatePassword(ctx context.Context, id string, password []byte) (err error) {
 	s.Lock()
 	defer s.Unlock()
-	return s.writeFile(s.fullPath(store.PasswordPrefix, id), password)
+	return s.writeFile(s.fullPath(store.PasswordPrefix, id, archiveExt), password)
 }
 
 //===========================================================================
@@ -73,7 +73,7 @@ func (s *Store) GetCertificate(ctx context.Context, name string) (cert []byte, e
 	defer s.RUnlock()
 
 	// Load the certificate archive into bytes
-	if cert, err = os.ReadFile(s.fullPath(store.CertificatePrefix, name)); err != nil {
+	if cert, err = os.ReadFile(s.fullPath(store.CertificatePrefix, name, "")); err != nil {
 		if os.IsNotExist(err) {
 			return nil, store.ErrNotFound
 		}
@@ -87,7 +87,7 @@ func (s *Store) GetCertificate(ctx context.Context, name string) (cert []byte, e
 func (s *Store) UpdateCertificate(ctx context.Context, name string, cert []byte) (err error) {
 	s.Lock()
 	defer s.Unlock()
-	return os.WriteFile(s.fullPath(store.CertificatePrefix, name), cert, 0644)
+	return os.WriteFile(s.fullPath(store.CertificatePrefix, name, ""), cert, 0644)
 }
 
 //===========================================================================
@@ -95,8 +95,8 @@ func (s *Store) UpdateCertificate(ctx context.Context, name string, cert []byte)
 //===========================================================================
 
 // fullPath returns the full path to an archive file in the local storage backend.
-func (s *Store) fullPath(prefix, name string) string {
-	return filepath.Join(s.path, prefix+"-"+name+archiveExt)
+func (s *Store) fullPath(prefix, name, ext string) string {
+	return filepath.Join(s.path, prefix+"-"+name+ext)
 }
 
 // read returns file data by archive path from the local storage

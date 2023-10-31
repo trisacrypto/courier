@@ -25,3 +25,6 @@ go.work
 
 # macOS
 *.DS_Store
+
+# Google credentials
+*.json

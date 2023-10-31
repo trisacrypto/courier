@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -86,6 +87,38 @@ func main() {
 						Name:    "file",
 						Aliases: []string{"f"},
 						Usage:   "specify a file to read the password from",
+					},
+				},
+			},
+			{
+				Name:     "store:certificate",
+				Usage:    "store a pkcs12 certificate using the courier server",
+				Category: "client",
+				Action:   storeCertificate,
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "url",
+						Aliases:  []string{"u", "endpoint"},
+						Usage:    "url to connect to the courier server",
+						EnvVars:  []string{"COURIER_CLIENT_URL"},
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "id",
+						Aliases:  []string{"i"},
+						Usage:    "the id of the certificate, used to lookup the stored password",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "file",
+						Aliases:  []string{"f"},
+						Usage:    "path to the certificate file",
+						Required: true,
+					},
+					&cli.BoolFlag{
+						Name:    "no-decrypt",
+						Aliases: []string{"D"},
+						Usage:   "do not decrypt the certificate before storing it",
 					},
 				},
 			},
@@ -204,6 +237,38 @@ func storePassword(c *cli.Context) (err error) {
 		Password: password,
 	}
 	if err = client.StoreCertificatePassword(ctx, req); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	return nil
+}
+
+// Store a certificate using the courier service.
+func storeCertificate(c *cli.Context) (err error) {
+	var client api.CourierClient
+	if client, err = api.New(c.String("url")); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var f *os.File
+	if f, err = os.Open(c.String("file")); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	var data []byte
+	if data, err = io.ReadAll(f); err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	req := &api.StoreCertificateRequest{
+		ID:                c.String("id"),
+		NoDecrypt:         c.Bool("no-decrypt"),
+		Base64Certificate: base64.StdEncoding.EncodeToString(data),
+	}
+	if err = client.StoreCertificate(ctx, req); err != nil {
 		return cli.Exit(err, 1)
 	}
 

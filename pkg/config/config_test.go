@@ -84,6 +84,22 @@ func TestValidate(t *testing.T) {
 		require.NoError(t, conf.Validate(), "secure config should be valid")
 	})
 
+	t.Run("ValidSecretManager", func(t *testing.T) {
+		conf := config.Config{
+			BindAddr: ":8080",
+			Mode:     "debug",
+			MTLS: config.MTLSConfig{
+				Insecure: true,
+			},
+			SecretManager: config.SecretsConfig{
+				Enabled:     true,
+				Credentials: "test-credentials",
+				Project:     "test-project",
+			},
+		}
+		require.NoError(t, conf.Validate(), "secret manager config should be valid")
+	})
+
 	t.Run("MissingBindAddr", func(t *testing.T) {
 		conf := config.Config{
 			Mode: "debug",
