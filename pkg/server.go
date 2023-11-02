@@ -15,6 +15,7 @@ import (
 	"github.com/trisacrypto/courier/pkg/api/v1"
 	"github.com/trisacrypto/courier/pkg/config"
 	"github.com/trisacrypto/courier/pkg/store"
+	"github.com/trisacrypto/courier/pkg/store/gcloud"
 	"github.com/trisacrypto/courier/pkg/store/local"
 )
 
@@ -37,6 +38,10 @@ func New(conf config.Config) (s *Server, err error) {
 	switch {
 	case conf.LocalStorage.Enabled:
 		if s.store, err = local.Open(conf.LocalStorage); err != nil {
+			return nil, err
+		}
+	case conf.SecretManager.Enabled:
+		if s.store, err = gcloud.Open(conf.SecretManager); err != nil {
 			return nil, err
 		}
 	default:
