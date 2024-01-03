@@ -47,6 +47,9 @@ func ErrorResponse(err interface{}) Reply {
 }
 
 func NewStatusError(code int, err string) error {
+	if err == "" {
+		err = http.StatusText(code)
+	}
 	return &StatusError{Code: code, Err: err}
 }
 
