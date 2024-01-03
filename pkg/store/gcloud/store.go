@@ -10,7 +10,7 @@ import (
 )
 
 // Open the google cloud storage backend.
-func Open(conf config.SecretsConfig, opts ...StoreOption) (store *Store, err error) {
+func Open(conf config.GCPSecretsConfig, opts ...StoreOption) (store *Store, err error) {
 	store = &Store{}
 
 	// Apply provided options

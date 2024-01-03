@@ -40,8 +40,8 @@ func New(conf config.Config) (s *Server, err error) {
 		if s.store, err = local.Open(conf.LocalStorage); err != nil {
 			return nil, err
 		}
-	case conf.SecretManager.Enabled:
-		if s.store, err = gcloud.Open(conf.SecretManager); err != nil {
+	case conf.GCPSecretManager.Enabled:
+		if s.store, err = gcloud.Open(conf.GCPSecretManager); err != nil {
 			return nil, err
 		}
 	default:

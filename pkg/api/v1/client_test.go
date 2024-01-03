@@ -4,8 +4,11 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/stretchr/testify/require"
 	"github.com/trisacrypto/courier/pkg/api/v1"
 )
@@ -62,4 +65,32 @@ func TestStoreCertificatePassword(t *testing.T) {
 	req.ID = ""
 	err = client.StoreCertificatePassword(context.Background(), req)
 	require.ErrorIs(t, err, api.ErrIDRequired, "client should error if no ID is provided")
+}
+
+func TestRetriesWithBackoff(t *testing.T) {
+	// Create a test server
+	var attempts uint32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddUint32(&attempts, 1)
+		http.Error(w, http.StatusText(http.StatusTooEarly), http.StatusTooEarly)
+	}))
+	defer ts.Close()
+
+	// Create a client to test the client method
+	client, err := api.New(ts.URL, api.WithRetries(10), api.WithBackoff(func() backoff.BackOff {
+		return backoff.NewConstantBackOff(100 * time.Millisecond)
+	}))
+	require.NoError(t, err, "could not create client")
+
+	rawClient, ok := client.(*api.APIv1)
+	require.True(t, ok, "expected client to be an APIv1 client")
+
+	req, err := rawClient.NewRequest(context.Background(), http.MethodGet, "/", nil, nil)
+	require.NoError(t, err, "could not create request")
+
+	start := time.Now()
+	_, err = rawClient.Do(req, nil, true)
+	require.Error(t, err, "expected an error to be returned")
+	require.Equal(t, uint32(11), attempts, "expected 10 retry attempts")
+	require.Greater(t, time.Since(start), 950*time.Millisecond, "expected backoff delay")
 }

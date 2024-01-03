@@ -4,13 +4,22 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/cenkalti/backoff/v4"
 )
+
+const DefaultRetries = 3
+
+func DefaultBackoff() BackoffFactory {
+	return func() backoff.BackOff {
+		return backoff.NewExponentialBackOff()
+	}
+}
 
 // New creates a new API client that implements the CourierClient interface.
 func New(endpoint string, opts ...ClientOption) (_ CourierClient, err error) {
@@ -19,7 +28,7 @@ func New(endpoint string, opts ...ClientOption) (_ CourierClient, err error) {
 	}
 
 	// Create a client with the parsed endpoint.
-	c := &APIv1{}
+	c := &APIv1{retries: -1}
 	if c.url, err = url.Parse(endpoint); err != nil {
 		return nil, err
 	}
@@ -39,13 +48,26 @@ func New(endpoint string, opts ...ClientOption) (_ CourierClient, err error) {
 			Timeout:       30 * time.Second,
 		}
 	}
+
+	// If backoff hasn't been specified add the default backoff factory
+	if c.backoff == nil {
+		c.backoff = DefaultBackoff()
+	}
+
+	// If retries haven't been specified add the default number of retries
+	if c.retries < 0 {
+		c.retries = DefaultRetries
+	}
+
 	return c, nil
 }
 
 // APIv1 implements the CourierClient interface.
 type APIv1 struct {
-	url    *url.URL
-	client *http.Client
+	url     *url.URL
+	client  *http.Client
+	backoff BackoffFactory
+	retries int
 }
 
 var _ CourierClient = &APIv1{}
@@ -172,8 +194,47 @@ func (c *APIv1) NewRequest(ctx context.Context, method, path string, data interf
 }
 
 // Do executes an http request against the server, performs error checking, and
-// deserializes response data into the specified struct.
+// deserializes response data into the specified struct. This function also manages
+// retries using a backoff strategy.
 func (s *APIv1) Do(req *http.Request, data interface{}, checkStatus bool) (rep *http.Response, err error) {
+	attempts := 0
+	start := time.Now()
+	ctx := req.Context()
+	delay := s.backoff()
+	errs := make([]error, 0, s.retries+1)
+
+	for attempts <= s.retries {
+		attempts++
+		if rep, err = s.do(req, data, checkStatus); err == nil {
+			// Success!
+			return rep, nil
+		}
+
+		// Failure! Retry as needed.
+		errs = append(errs, err)
+
+		// Compute the backoff delay before the next request
+		dur := delay.NextBackOff()
+		if dur == backoff.Stop {
+			// Stop indicates no more retries should be allowed.
+			return rep, JoinStatusErrors(attempts, time.Since(start), errs...)
+		}
+
+		// Wait for backoff delay or until context is canceled
+		wait := time.After(dur)
+		select {
+		case <-ctx.Done():
+			errs = append(errs, ctx.Err())
+			return rep, JoinStatusErrors(attempts, time.Since(start), errs...)
+		case <-wait:
+			continue
+		}
+	}
+
+	return rep, JoinStatusErrors(attempts, time.Since(start), errs...)
+}
+
+func (s *APIv1) do(req *http.Request, data interface{}, checkStatus bool) (rep *http.Response, err error) {
 	if rep, err = s.client.Do(req); err != nil {
 		return rep, err
 	}
@@ -189,8 +250,7 @@ func (s *APIv1) Do(req *http.Request, data interface{}, checkStatus bool) (rep *
 					return rep, NewStatusError(rep.StatusCode, reply.Error)
 				}
 			}
-
-			return rep, errors.New(rep.Status)
+			return rep, NewStatusError(rep.StatusCode, rep.Status)
 		}
 	}
 

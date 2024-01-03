@@ -19,7 +19,7 @@ import (
 type gcloudStoreTestSuite struct {
 	suite.Suite
 	store *gcloud.Store
-	conf  config.SecretsConfig
+	conf  config.GCPSecretsConfig
 	sm    *mock.SecretManager
 }
 
@@ -27,7 +27,7 @@ func (s *gcloudStoreTestSuite) SetupSuite() {
 	// Open the storage backend using a mock secrets client
 	var err error
 	s.sm = mock.New()
-	s.conf = config.SecretsConfig{
+	s.conf = config.GCPSecretsConfig{
 		Enabled:     true,
 		Credentials: "creds.json",
 		Project:     "project",

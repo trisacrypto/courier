@@ -277,7 +277,7 @@ func storeCertificate(c *cli.Context) (err error) {
 
 // Get a secret from the secret manager.
 func getSecret(c *cli.Context) (err error) {
-	conf := config.SecretsConfig{
+	conf := config.GCPSecretsConfig{
 		Enabled:     true,
 		Project:     c.String("project"),
 		Credentials: c.String("credentials"),
