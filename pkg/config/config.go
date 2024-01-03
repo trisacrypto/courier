@@ -9,12 +9,12 @@ import (
 )
 
 type Config struct {
-	BindAddr      string             `split_words:"true" default:":8842"`
-	Mode          string             `split_words:"true" default:"release"`
-	MTLS          MTLSConfig         `split_words:"true"`
-	LocalStorage  LocalStorageConfig `split_words:"true"`
-	SecretManager SecretsConfig      `split_words:"true"`
-	processed     bool
+	BindAddr         string             `split_words:"true" default:":8842"`
+	Mode             string             `split_words:"true" default:"release"`
+	MTLS             MTLSConfig         `split_words:"true"`
+	LocalStorage     LocalStorageConfig `split_words:"true"`
+	GCPSecretManager GCPSecretsConfig   `split_words:"true"`
+	processed        bool
 }
 
 type MTLSConfig struct {
@@ -30,7 +30,7 @@ type LocalStorageConfig struct {
 	Path    string `split_words:"true"`
 }
 
-type SecretsConfig struct {
+type GCPSecretsConfig struct {
 	Enabled     bool   `split_words:"true" default:"false"`
 	Credentials string `split_words:"true"`
 	Project     string `split_words:"true"`
@@ -76,11 +76,11 @@ func (c Config) Validate() (err error) {
 		return err
 	}
 
-	if !c.LocalStorage.Enabled && !c.SecretManager.Enabled {
+	if !c.LocalStorage.Enabled && !c.GCPSecretManager.Enabled {
 		return ErrNoStorageEnabled
 	}
 
-	if c.LocalStorage.Enabled && c.SecretManager.Enabled {
+	if c.LocalStorage.Enabled && c.GCPSecretManager.Enabled {
 		return ErrMultipleStorageEnabled
 	}
 
@@ -88,7 +88,7 @@ func (c Config) Validate() (err error) {
 		return err
 	}
 
-	if err = c.SecretManager.Validate(); err != nil {
+	if err = c.GCPSecretManager.Validate(); err != nil {
 		return err
 	}
 
@@ -199,7 +199,7 @@ func (c LocalStorageConfig) Validate() (err error) {
 	return nil
 }
 
-func (c SecretsConfig) Validate() (err error) {
+func (c GCPSecretsConfig) Validate() (err error) {
 	if !c.Enabled {
 		return nil
 	}

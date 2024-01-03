@@ -52,9 +52,9 @@ func (s *courierTestSuite) SetupSuite() {
 	// Wait for the server to start serving the API
 	time.Sleep(500 * time.Millisecond)
 
-	// Create an API client to use in tests
+	// Create an API client to use in tests (no retries, no backoff for testing errors)
 	url := s.courier.URL()
-	s.client, err = api.New(url)
+	s.client, err = api.New(url, api.WithRetries(0), api.WithZeroBackoff())
 	require.NoError(err, "could not create test client")
 }
 

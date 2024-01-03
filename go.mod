@@ -1,9 +1,10 @@
 module github.com/trisacrypto/courier
 
-go 1.20
+go 1.21
 
 require (
 	cloud.google.com/go/secretmanager v1.11.2
+	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/gin-gonic/gin v1.9.1
 	github.com/googleapis/gax-go v1.0.3
 	github.com/joho/godotenv v1.5.1

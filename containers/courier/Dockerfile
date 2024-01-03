@@ -1,5 +1,5 @@
 # Dynamic Builds
-ARG BUILDER_IMAGE=golang:1.20-buster
+ARG BUILDER_IMAGE=golang:1.21-buster
 ARG FINAL_IMAGE=debian:buster-slim
 
 # Build Stage
