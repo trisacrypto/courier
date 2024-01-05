@@ -4,11 +4,11 @@ import "fmt"
 
 // Version of the current build
 const (
-	VersionMajor         = 0
-	VersionMinor         = 1
+	VersionMajor         = 1
+	VersionMinor         = 0
 	VersionPatch         = 0
-	VersionReleaseLevel  = "beta"
-	VersionReleaseNumber = 1
+	VersionReleaseLevel  = ""
+	VersionReleaseNumber = 2
 )
 
 // Set the GitVersion via -ldflags="-X 'github.com/trisacrypto/courier/pkg.GitVersion=$(git rev-parse --short HEAD)'"
