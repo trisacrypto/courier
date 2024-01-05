@@ -1,6 +1,6 @@
 module github.com/trisacrypto/courier
 
-go 1.19
+go 1.21
 
 require (
 	cloud.google.com/go/secretmanager v1.11.2
