@@ -10,12 +10,14 @@ import (
 	"github.com/trisacrypto/trisa/pkg/trust"
 )
 
+const Prefix = "courier"
+
 type Config struct {
-	Maintenance      bool                `default:"false"`
-	BindAddr         string              `split_words:"true" default:":8842"`
-	Mode             string              `split_words:"true" default:"release"`
-	LogLevel         logger.LevelDecoder `split_words:"true" default:"info"`
-	ConsoleLog       bool                `split_words:"true" default:"false"`
+	Maintenance      bool                `default:"false" desc:"starts the server in maintenance mode"`
+	BindAddr         string              `split_words:"true" default:":8842" desc:"ip address and port of server"`
+	Mode             string              `split_words:"true" default:"release" desc:"either debug or release"`
+	LogLevel         logger.LevelDecoder `split_words:"true" default:"info" desc:"verbosity of logging: trace, debug, info, warn, error, fatal, panic"`
+	ConsoleLog       bool                `split_words:"true" default:"false" desc:"set for human readable logs (otherwise json logs)"`
 	MTLS             MTLSConfig          `split_words:"true"`
 	LocalStorage     LocalStorageConfig  `split_words:"true"`
 	GCPSecretManager GCPSecretsConfig    `split_words:"true"`
@@ -23,27 +25,27 @@ type Config struct {
 }
 
 type MTLSConfig struct {
-	Insecure bool   `split_words:"true" default:"true"`
-	CertPath string `split_words:"true"`
-	PoolPath string `split_words:"true"`
+	Insecure bool   `split_words:"true" default:"true" desc:"set to false to enable TLS configuration"`
+	CertPath string `split_words:"true" desc:"the certificate chain and private key of the server"`
+	PoolPath string `split_words:"true" desc:"the cert pool to validate clients for mTLS"`
 	pool     *x509.CertPool
 	cert     tls.Certificate
 }
 
 type LocalStorageConfig struct {
-	Enabled bool   `split_words:"true" default:"false"`
-	Path    string `split_words:"true"`
+	Enabled bool   `split_words:"true" default:"false" desc:"set to true to enable local storage"`
+	Path    string `split_words:"true" desc:"path to the directory to store certs and passwords"`
 }
 
 type GCPSecretsConfig struct {
-	Enabled     bool   `split_words:"true" default:"false"`
-	Credentials string `split_words:"true"`
-	Project     string `split_words:"true"`
+	Enabled     bool   `split_words:"true" default:"false" desc:"set to true to enable GCP secret manager"`
+	Credentials string `split_words:"true" desc:"path to json file with gcp service account credentials"`
+	Project     string `split_words:"true" desc:"name of gcp project to use with secret manager"`
 }
 
 // Create a new Config struct using values from the environment prefixed with COURIER.
 func New() (conf Config, err error) {
-	if err = confire.Process("courier", &conf); err != nil {
+	if err = confire.Process(Prefix, &conf); err != nil {
 		return conf, err
 	}
 
