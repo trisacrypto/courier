@@ -8,9 +8,11 @@ import (
 	"io"
 	"log"
 	"os"
+	"text/tabwriter"
 	"time"
 
 	"github.com/joho/godotenv"
+	confire "github.com/rotationalio/confire/usage"
 	courier "github.com/trisacrypto/courier/pkg"
 	"github.com/trisacrypto/courier/pkg/api/v1"
 	"github.com/trisacrypto/courier/pkg/config"
@@ -41,6 +43,19 @@ func main() {
 						Usage:    "address:port to bind the server on",
 						EnvVars:  []string{"COURIER_BIND_ADDR"},
 						Required: true,
+					},
+				},
+			},
+			{
+				Name:     "config",
+				Usage:    "print courier configuration guide",
+				Category: "server",
+				Action:   usage,
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "list",
+						Aliases: []string{"l"},
+						Usage:   "print in list mode instead of table mode",
 					},
 				},
 			},
@@ -159,7 +174,7 @@ func main() {
 }
 
 //===========================================================================
-// CLI Actions
+// Server Actions
 //===========================================================================
 
 // Serve the courier service.
@@ -184,6 +199,25 @@ func serve(c *cli.Context) (err error) {
 
 	return nil
 }
+
+func usage(c *cli.Context) (err error) {
+	tabs := tabwriter.NewWriter(os.Stdout, 1, 0, 4, ' ', 0)
+	format := confire.DefaultTableFormat
+	if c.Bool("list") {
+		format = confire.DefaultListFormat
+	}
+
+	var conf config.Config
+	if err := confire.Usagef(config.Prefix, &conf, tabs, format); err != nil {
+		return cli.Exit(err, 1)
+	}
+	tabs.Flush()
+	return nil
+}
+
+//===========================================================================
+// Client Actions
+//===========================================================================
 
 // Get the status of the courier service.
 func status(c *cli.Context) (err error) {
