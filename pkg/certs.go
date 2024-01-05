@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/trisacrypto/courier/pkg/api/v1"
+	"github.com/trisacrypto/courier/pkg/o11y"
 	"github.com/trisacrypto/courier/pkg/store"
 	"github.com/trisacrypto/trisa/pkg/trust"
 )
@@ -78,6 +79,7 @@ func (s *Server) StoreCertificate(c *gin.Context) {
 	}
 
 	// Return 204 No Content
+	o11y.Certificates.Inc()
 	c.Status(http.StatusNoContent)
 }
 
@@ -109,5 +111,6 @@ func (s *Server) StoreCertificatePassword(c *gin.Context) {
 	}
 
 	// Return 204 No Content
+	o11y.Passwords.Inc()
 	c.Status(http.StatusNoContent)
 }

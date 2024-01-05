@@ -16,6 +16,7 @@ import (
 	"github.com/trisacrypto/courier/pkg/api/v1"
 	"github.com/trisacrypto/courier/pkg/config"
 	"github.com/trisacrypto/courier/pkg/logger"
+	"github.com/trisacrypto/courier/pkg/o11y"
 	"github.com/trisacrypto/courier/pkg/store"
 	"github.com/trisacrypto/courier/pkg/store/gcloud"
 	"github.com/trisacrypto/courier/pkg/store/local"
@@ -192,8 +193,12 @@ func (s *Server) setupRoutes() (err error) {
 	s.router.GET("/livez", s.Healthz)
 	s.router.GET("/readyz", s.Readyz)
 
+	// Add prometheus metrics collector endpoint before middleware is added
+	s.router.GET("/metrics", o11y.Prometheus())
+
 	middlewares := []gin.HandlerFunc{
 		logger.GinLogger("courier", Version()),
+		o11y.Metrics(),
 		gin.Recovery(),
 		s.Available(),
 	}
