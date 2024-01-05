@@ -74,14 +74,15 @@ func New(conf config.Config) (s *Server, err error) {
 // Server defines the courier service and its webhook handlers.
 type Server struct {
 	sync.RWMutex
-	conf    config.Config
-	srv     *http.Server
-	router  *gin.Engine
-	store   store.Store
-	started time.Time
-	healthy bool
-	url     string
-	echan   chan error
+	conf    config.Config // Primary source of truth for server configuration
+	srv     *http.Server  // The HTTP server for handling requests
+	router  *gin.Engine   // The gin router for muxing requests to handlers
+	store   store.Store   // Manages certificate and password storage
+	healthy bool          // Indicates that the service is online and healthy
+	ready   bool          // Indicates that the service is ready to accept requests
+	started time.Time     // The timestamp the server was started (for uptime)
+	url     string        // The endpoint that the server is hosted on
+	echan   chan error    // Sending errors on this channel stops the server
 }
 
 // Serve API requests.
@@ -146,6 +147,12 @@ func (s *Server) Shutdown() (err error) {
 
 // Setup the routes for the courier service.
 func (s *Server) setupRoutes() (err error) {
+	// Kubernetes probe endpoints -- add routes before middleware to ensure these
+	// endpoints are not logged or subject to other handling that may harm correctness
+	s.router.GET("/healthz", s.Healthz)
+	s.router.GET("/livez", s.Healthz)
+	s.router.GET("/readyz", s.Readyz)
+
 	middlewares := []gin.HandlerFunc{
 		gin.Logger(),
 		gin.Recovery(),
@@ -174,13 +181,6 @@ func (s *Server) setupRoutes() (err error) {
 	s.router.NoMethod(api.MethodNotAllowed)
 
 	return nil
-}
-
-// Set the healthy status of the server.
-func (s *Server) SetHealthy(healthy bool) {
-	s.Lock()
-	s.healthy = healthy
-	s.Unlock()
 }
 
 // Set the URL of the server from the socket
