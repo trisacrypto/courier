@@ -11,13 +11,28 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/trisacrypto/courier/pkg/api/v1"
 	"github.com/trisacrypto/courier/pkg/config"
+	"github.com/trisacrypto/courier/pkg/logger"
 	"github.com/trisacrypto/courier/pkg/store"
 	"github.com/trisacrypto/courier/pkg/store/gcloud"
 	"github.com/trisacrypto/courier/pkg/store/local"
 )
+
+func init() {
+	// Initializes zerolog with our default logging requirements
+	zerolog.TimeFieldFormat = time.RFC3339
+	zerolog.TimestampFieldName = logger.GCPFieldKeyTime
+	zerolog.MessageFieldName = logger.GCPFieldKeyMsg
+	zerolog.DurationFieldInteger = false
+	zerolog.DurationFieldUnit = time.Millisecond
+
+	// Add the severity hook for GCP logging
+	var gcpHook logger.SeverityHook
+	log.Logger = zerolog.New(os.Stdout).Hook(gcpHook).With().Timestamp().Logger()
+}
 
 // New creates a new server object from configuration but does not serve it yet.
 func New(conf config.Config) (s *Server, err error) {
@@ -28,6 +43,12 @@ func New(conf config.Config) (s *Server, err error) {
 		}
 	}
 
+	// Setup our logging config first thing
+	zerolog.SetGlobalLevel(conf.GetLogLevel())
+	if conf.ConsoleLog {
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	}
+
 	// Create the server object
 	s = &Server{
 		conf:  conf,
@@ -35,30 +56,43 @@ func New(conf config.Config) (s *Server, err error) {
 	}
 
 	// Open the store
-	switch {
-	case conf.LocalStorage.Enabled:
-		if s.store, err = local.Open(conf.LocalStorage); err != nil {
-			return nil, err
+	if !s.conf.Maintenance {
+		switch {
+		case s.conf.LocalStorage.Enabled:
+			if s.store, err = local.Open(s.conf.LocalStorage); err != nil {
+				return nil, err
+			}
+		case s.conf.GCPSecretManager.Enabled:
+			if s.store, err = gcloud.Open(s.conf.GCPSecretManager); err != nil {
+				return nil, err
+			}
+		default:
+			return nil, errors.New("no storage backend configured")
 		}
-	case conf.GCPSecretManager.Enabled:
-		if s.store, err = gcloud.Open(conf.GCPSecretManager); err != nil {
-			return nil, err
-		}
-	default:
-		return nil, errors.New("no storage backend configured")
 	}
 
 	// Create the router
 	gin.SetMode(conf.Mode)
 	s.router = gin.New()
+	s.router.RedirectTrailingSlash = true
+	s.router.RedirectFixedPath = false
+	s.router.HandleMethodNotAllowed = true
+	s.router.ForwardedByClientIP = true
+	s.router.UseRawPath = false
+	s.router.UnescapePathValues = true
+
 	if err = s.setupRoutes(); err != nil {
 		return nil, err
 	}
 
 	// Create the http server
 	s.srv = &http.Server{
-		Addr:    conf.BindAddr,
-		Handler: s.router,
+		Addr:              conf.BindAddr,
+		Handler:           s.router,
+		ErrorLog:          nil,
+		ReadHeaderTimeout: 20 * time.Second,
+		WriteTimeout:      20 * time.Second,
+		IdleTimeout:       90 * time.Second,
 	}
 
 	// Use TLS if configured
@@ -115,6 +149,7 @@ func (s *Server) Serve() (err error) {
 		}
 	}()
 
+	s.SetReady(true)
 	log.Info().Str("listen", s.url).Str("version", Version()).Msg("courier server started")
 
 	// Wait for shutdown or an error
@@ -135,14 +170,18 @@ func (s *Server) Shutdown() (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	if err = s.srv.Shutdown(ctx); err != nil {
-		return err
+	if serr := s.srv.Shutdown(ctx); serr != nil {
+		err = errors.Join(err, serr)
 	}
 
-	// TODO: Close the stores
+	if !s.conf.Maintenance {
+		if serr := s.store.Close(); serr != nil {
+			err = errors.Join(err, serr)
+		}
+	}
 
-	log.Debug().Msg("successfully shut down courier server")
-	return nil
+	log.Debug().Err(err).Msg("shut down courier server")
+	return err
 }
 
 // Setup the routes for the courier service.
@@ -154,7 +193,7 @@ func (s *Server) setupRoutes() (err error) {
 	s.router.GET("/readyz", s.Readyz)
 
 	middlewares := []gin.HandlerFunc{
-		gin.Logger(),
+		logger.GinLogger("courier", Version()),
 		gin.Recovery(),
 		s.Available(),
 	}
@@ -179,7 +218,6 @@ func (s *Server) setupRoutes() (err error) {
 	// Not found and method not allowed routes
 	s.router.NoRoute(api.NotFound)
 	s.router.NoMethod(api.MethodNotAllowed)
-
 	return nil
 }
 
