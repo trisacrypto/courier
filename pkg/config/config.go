@@ -5,15 +5,20 @@ import (
 	"crypto/x509"
 
 	"github.com/rotationalio/confire"
+	"github.com/rs/zerolog"
+	"github.com/trisacrypto/courier/pkg/logger"
 	"github.com/trisacrypto/trisa/pkg/trust"
 )
 
 type Config struct {
-	BindAddr         string             `split_words:"true" default:":8842"`
-	Mode             string             `split_words:"true" default:"release"`
-	MTLS             MTLSConfig         `split_words:"true"`
-	LocalStorage     LocalStorageConfig `split_words:"true"`
-	GCPSecretManager GCPSecretsConfig   `split_words:"true"`
+	Maintenance      bool                `default:"false"`
+	BindAddr         string              `split_words:"true" default:":8842"`
+	Mode             string              `split_words:"true" default:"release"`
+	LogLevel         logger.LevelDecoder `split_words:"true" default:"info"`
+	ConsoleLog       bool                `split_words:"true" default:"false"`
+	MTLS             MTLSConfig          `split_words:"true"`
+	LocalStorage     LocalStorageConfig  `split_words:"true"`
+	GCPSecretManager GCPSecretsConfig    `split_words:"true"`
 	processed        bool
 }
 
@@ -93,6 +98,11 @@ func (c Config) Validate() (err error) {
 	}
 
 	return nil
+}
+
+// Parse and return the zerolog log level for configuring global logging.
+func (c Config) GetLogLevel() zerolog.Level {
+	return zerolog.Level(c.LogLevel)
 }
 
 func (c *MTLSConfig) Validate() error {

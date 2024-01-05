@@ -4,14 +4,18 @@ import (
 	"os"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/trisacrypto/courier/pkg/config"
 )
 
 // Define a test environment for the config tests.
 var testEnv = map[string]string{
+	"COURIER_MAINTENANCE":                    "true",
 	"COURIER_BIND_ADDR":                      ":8080",
 	"COURIER_MODE":                           "debug",
+	"COURIER_LOG_LEVEL":                      "warn",
+	"COURIER_CONSOLE_LOG":                    "true",
 	"COURIER_MTLS_INSECURE":                  "false",
 	"COURIER_MTLS_CERT_PATH":                 "/path/to/cert",
 	"COURIER_MTLS_POOL_PATH":                 "/path/to/pool",
@@ -40,8 +44,11 @@ func TestConfig(t *testing.T) {
 	require.NoError(t, err, "could not create config from test environment")
 	require.False(t, conf.IsZero(), "config should be processed")
 
+	require.True(t, conf.Maintenance)
 	require.Equal(t, testEnv["COURIER_BIND_ADDR"], conf.BindAddr)
 	require.Equal(t, testEnv["COURIER_MODE"], conf.Mode)
+	require.Equal(t, zerolog.WarnLevel, conf.GetLogLevel())
+	require.True(t, conf.ConsoleLog)
 	require.False(t, conf.MTLS.Insecure)
 	require.Equal(t, testEnv["COURIER_MTLS_CERT_PATH"], conf.MTLS.CertPath)
 	require.Equal(t, testEnv["COURIER_MTLS_POOL_PATH"], conf.MTLS.PoolPath)

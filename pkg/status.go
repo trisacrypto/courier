@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	serverStatusOK       = "ok"
-	serverStatusStopping = "stopping"
+	serverStatusOK          = "ok"
+	serverStatusStopping    = "stopping"
+	serverStatusMaintenance = "maintenance"
 )
 
 // Status returns the status of the server.
@@ -30,21 +31,28 @@ func (s *Server) Status(c *gin.Context) {
 // http status code if the server is shutting down. This middleware must be first in the
 // chain to ensure that complex handling to slow the shutdown of the server.
 func (s *Server) Available() gin.HandlerFunc {
+	// The server starts in maintenance mode and doesn't change during runtime, so
+	// determine what the unhealthy status string is going to be prior to the closure.
+	status := serverStatusStopping
+	if s.conf.Maintenance {
+		status = serverStatusMaintenance
+	}
+
 	return func(c *gin.Context) {
 		// Check health status
-		s.RLock()
-		if !s.healthy {
+		if s.conf.Maintenance || !s.IsReady() {
 			c.JSON(http.StatusServiceUnavailable, api.StatusReply{
-				Status:  serverStatusStopping,
+				Status:  status,
 				Uptime:  time.Since(s.started).String(),
 				Version: Version(),
 			})
 
+			// Stop processing the request if the server is not ready
 			c.Abort()
-			s.RUnlock()
 			return
 		}
-		s.RUnlock()
+
+		// Continue processing the request
 		c.Next()
 	}
 }
