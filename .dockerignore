@@ -1,0 +1,29 @@
+# For humans
+LICENSE
+README.md
+
+# git stuff
+.git
+.gitignore
+.github
+
+# Development
+.vscode
+.env.template
+
+# OS Droppings
+.DS_Store
+
+# Node stuff
+node_modules
+build
+
+# Docker stuff
+.dockerignore
+Dockerfile
+Dockerfile.prod
+docker-compose.yaml
+
+# Local configuration
+fixtures
+.env
