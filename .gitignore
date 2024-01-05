@@ -9,7 +9,9 @@
 *.dylib
 
 # Environment variables
-*.env
+.env
+.secret
+fixtures
 
 # Test binary, built with `go test -c`
 *.test
@@ -25,6 +27,4 @@ go.work
 
 # macOS
 *.DS_Store
-
-# Google credentials
-*.json
+.DS_Store

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"io"
 )
 
 const (
@@ -11,7 +12,7 @@ const (
 
 // Store is a generic interface for storing and retrieving data.
 type Store interface {
-	Close() error
+	io.Closer
 	PasswordStore
 	CertificateStore
 }

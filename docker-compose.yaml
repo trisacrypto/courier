@@ -1,0 +1,24 @@
+version: "3"
+services:
+  courier:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      args:
+        GIT_REVISION: ${GIT_REVISION}
+    image: trisa/courier
+    init: true
+    ports:
+      - 8842:8842
+    volumes:
+      - ./courier/data:/data
+    environment:
+      - COURIER_MAINTENANCE=false
+      - COURIER_BIND_ADDR=:8842
+      - COURIER_MODE=debug
+      - COURIER_LOG_LEVEL=debug
+      - COURIER_CONSOLE_LOG=true
+      - COURIER_MTLS_INSECURE=true
+      - COURIER_LOCAL_STORAGE_ENABLED=true
+      - COURIER_LOCAL_STORAGE_PATH=/data
+      - COURIER_GCP_SECRET_MANAGER_ENABLED=false
