@@ -33,7 +33,7 @@ RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -v -o /go/bin/courier -ldflag
 # Final Stage
 FROM --platform=${BUILDPLATFORM} ${FINAL_IMAGE} AS final
 
-LABEL maintainer="TRISA <info@trisa.io>"
+LABEL maintainer="TRISA <info@travelrule.io>"
 LABEL description="Courier TSP Certificate Delivery Service"
 
 # Ensure ca-certificates are up to date
